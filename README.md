@@ -1,5 +1,6 @@
 # portal sample (React + Three.js + .NET + APS)
-<img width="1626" height="886" alt="image" src="https://github.com/user-attachments/assets/ba44521f-6f00-45a0-be6f-9509a8e06a2d" />
+<img width="1586" height="644" alt="image" src="https://github.com/user-attachments/assets/88801e75-9b28-4b8b-8962-575c5b57365e" />
+
 
 <img width="1626" height="886" alt="image" src="https://github.com/user-attachments/assets/0530a87b-a797-406f-bc99-fc2bff587727" />
 
