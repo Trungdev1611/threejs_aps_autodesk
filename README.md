@@ -1,4 +1,10 @@
-# BIM portal sample (React + Three.js + .NET + APS)
+# portal sample (React + Three.js + .NET + APS)
+<img width="1586" height="644" alt="image" src="https://github.com/user-attachments/assets/88801e75-9b28-4b8b-8962-575c5b57365e" />
+
+<img width="1097" height="859" alt="image" src="https://github.com/user-attachments/assets/c1d0cf01-a339-4cec-9b07-158105b6473a" />
+
+
+
 
 This repo is a small **BIM-style web portal** showcasing:
 - a React dashboard UI,
