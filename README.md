@@ -1,8 +1,9 @@
 # portal sample (React + Three.js + .NET + APS)
 <img width="1586" height="644" alt="image" src="https://github.com/user-attachments/assets/88801e75-9b28-4b8b-8962-575c5b57365e" />
 
+<img width="1097" height="859" alt="image" src="https://github.com/user-attachments/assets/c1d0cf01-a339-4cec-9b07-158105b6473a" />
 
-<img width="1626" height="886" alt="image" src="https://github.com/user-attachments/assets/0530a87b-a797-406f-bc99-fc2bff587727" />
+
 
 
 This repo is a small **BIM-style web portal** showcasing:
