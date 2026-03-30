@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Environment } from '@react-three/drei'
 
-/** Cộng hai vec3 (dùng khi cộng dồn offset nhóm → tâm world). */
+/** Add two vec3 (used to accumulate group offsets -> world center). */
 function addVec3(
   a: readonly [number, number, number],
   b: readonly [number, number, number],
@@ -11,9 +11,9 @@ function addVec3(
 }
 
 /**
- * Một khối hộp (mesh) trong scene:
- * - `centerInGroup`: tâm hình hộp trong **hệ tọa độ local của group tòa** (trùng với prop `position` của <mesh>).
- * - `size`: tham số `boxGeometry args` = [chiều rộng X, cao Y, sâu Z]. Three.js đặt hộp **căn tâm** tại `position`.
+ * A box part (mesh) in the scene:
+ * - `centerInGroup`: box center in the tower group local space (same as <mesh> `position`).
+ * - `size`: `boxGeometry args` = [width X, height Y, depth Z]. Three.js boxes are center-aligned at `position`.
  */
 type BuildingPartDef = {
   name: string
@@ -23,8 +23,8 @@ type BuildingPartDef = {
 }
 
 /**
- * Mỗi tòa = một <group> con trong ThreeBuildings.
- * `groupPosition`: dịch cả tòa so với gốc của ThreeBuildings (ví dụ bên trái X âm).
+ * Each tower is a child <group> in ThreeBuildings.
+ * `groupPosition`: offsets the whole tower relative to the ThreeBuildings root.
  */
 type TowerDef = {
   id: string
@@ -34,41 +34,41 @@ type TowerDef = {
 }
 
 /**
- * Offset gốc của cả cụm ThreeBuildings trong scene (parent của Canvas world).
- * Mọi "tâm world" bên dưới = rootOffset + groupPosition + centerInGroup (cộng vector).
+ * Root offset of the whole ThreeBuildings cluster in the scene (Canvas world parent).
+ * World center = rootOffset + groupPosition + centerInGroup (vector addition).
  */
 const THREE_BUILDINGS_ROOT: [number, number, number] = [0, -0.5, 0]
 
-/** Ba tòa: dữ liệu dùng chung để vừa render mesh vừa tính bảng tọa độ. */
+/** Three towers: shared data for both rendering and metrics panel. */
 const TOWERS: TowerDef[] = [
   {
     id: 'left',
-    label: 'Tòa trái',
+    label: 'Left tower',
     groupPosition: [-4, 0, 0],
     parts: [
-      { name: 'Đế', centerInGroup: [0, 0.5, 0], size: [3, 1, 2.5], color: '#5c6b7a' },
-      { name: 'Thân', centerInGroup: [0, 2.25, 0], size: [2.2, 3, 2.2], color: '#5c6b7a' },
-      { name: 'Khối mái', centerInGroup: [0, 4.35, 0.35], size: [1.2, 1.2, 1], color: '#c9d4e0' },
+      { name: 'Base', centerInGroup: [0, 0.5, 0], size: [3, 1, 2.5], color: '#5c6b7a' },
+      { name: 'Shaft', centerInGroup: [0, 2.25, 0], size: [2.2, 3, 2.2], color: '#5c6b7a' },
+      { name: 'Top', centerInGroup: [0, 4.35, 0.35], size: [1.2, 1.2, 1], color: '#c9d4e0' },
     ],
   },
   {
     id: 'center',
-    label: 'Tòa giữa',
+    label: 'Center tower',
     groupPosition: [0, 0, 0],
     parts: [
-      { name: 'Đế', centerInGroup: [0, 0.5, 0], size: [3, 1, 2.5], color: '#b4426a' },
-      { name: 'Thân', centerInGroup: [0, 2.25, 0], size: [2.2, 3, 2.2], color: '#b4426a' },
-      { name: 'Khối mái', centerInGroup: [0, 4.35, 0.35], size: [1.2, 1.2, 1], color: '#c9d4e0' },
+      { name: 'Base', centerInGroup: [0, 0.5, 0], size: [3, 1, 2.5], color: '#b4426a' },
+      { name: 'Shaft', centerInGroup: [0, 2.25, 0], size: [2.2, 3, 2.2], color: '#b4426a' },
+      { name: 'Top', centerInGroup: [0, 4.35, 0.35], size: [1.2, 1.2, 1], color: '#c9d4e0' },
     ],
   },
   {
     id: 'right',
-    label: 'Tòa phải',
+    label: 'Right tower',
     groupPosition: [4, 0, 0],
     parts: [
-      { name: 'Đế', centerInGroup: [0, 0.5, 0], size: [3, 1, 2.5], color: '#42b48e' },
-      { name: 'Thân', centerInGroup: [0, 2.25, 0], size: [2.2, 3, 2.2], color: '#42b48e' },
-      { name: 'Khối mái', centerInGroup: [0, 4.35, 0.35], size: [1.2, 1.2, 1], color: '#c9d4e0' },
+      { name: 'Base', centerInGroup: [0, 0.5, 0], size: [3, 1, 2.5], color: '#42b48e' },
+      { name: 'Shaft', centerInGroup: [0, 2.25, 0], size: [2.2, 3, 2.2], color: '#42b48e' },
+      { name: 'Top', centerInGroup: [0, 4.35, 0.35], size: [1.2, 1.2, 1], color: '#c9d4e0' },
     ],
   },
 ]
@@ -76,15 +76,15 @@ const TOWERS: TowerDef[] = [
 type MetricRow = {
   towerLabel: string
   partName: string
-  /** Tâm khối trong hệ world của scene (đã cộng root + group + local center). */
+  /** Box center in world space (root + group + local center). */
   worldCenter: [number, number, number]
-  /** Kích thước hộp: rộng X × cao Y × sâu Z (đơn vị giống scene, thường là mét tùy bạn quy ước). */
+  /** Box size: width X × height Y × depth Z (scene units). */
   size: [number, number, number]
 }
 
 /**
- * Từ định nghĩa tòa + part → một dòng bảng: tâm world và size.
- * Công thức: worldCenter = THREE_BUILDINGS_ROOT + tower.groupPosition + part.centerInGroup
+ * Build a metrics row per part.
+ * Formula: worldCenter = THREE_BUILDINGS_ROOT + tower.groupPosition + part.centerInGroup
  */
 function buildMetricRows(): MetricRow[] {
   const rows: MetricRow[] = []
@@ -106,9 +106,9 @@ function ThreeBuildings({ showCenterMarkers }: { showCenterMarkers: boolean }) {
   return (
     <group position={THREE_BUILDINGS_ROOT}>
       {/*
-        Lặp từng tòa: groupPosition dịch cả khối mesh theo trục (ở đây chủ yếu X).
-        Mỗi part bọc trong <group position={centerInGroup}>: gốc local = tâm hộp (boxGeometry căn tâm tại 0,0,0).
-        Marker debug: sphere cùng gốc → trùng tâm khối; depthTest=false để luôn nhìn thấy khi bị che.
+        Each tower is offset by groupPosition (mostly X).
+        Each part is wrapped in <group position={centerInGroup}> so local origin = box center.
+        Debug marker: a sphere at the local origin (center). depthTest=false keeps it visible.
       */}
       {TOWERS.map((tower) => (
         <group key={tower.id} position={tower.groupPosition}>
@@ -135,7 +135,7 @@ function ThreeBuildings({ showCenterMarkers }: { showCenterMarkers: boolean }) {
         </group>
       ))}
 
-      {/* Mặt đất: plane nằm trong group root, không đưa vào bảng tọa độ tòa nhà */}
+      {/* Ground plane (not part of tower metrics). */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[40, 40]} />
         <meshStandardMaterial color="#2a2f36" roughness={0.9} />
@@ -156,8 +156,8 @@ export function ThreeDemoPage() {
     <div className="page page-fill">
       <h1>Three.js (React Three Fiber)</h1>
       <p className="lede">
-        Ba tòa được mô tả bằng dữ liệu; bảng bên phải hiển thị <strong>tâm world</strong> và{' '}
-        <strong>kích thước</strong> từng khối (xem comment trong file).
+        Three towers are described via data; the right panel shows <strong>world centers</strong> and{' '}
+        <strong>sizes</strong> per block.
       </p>
 
       <label className="three-debug-toggle">
@@ -166,7 +166,7 @@ export function ThreeDemoPage() {
           checked={showCenterMarkers}
           onChange={(e) => setShowCenterMarkers(e.target.checked)}
         />
-        <span>Hiện tâm khối — cầu vàng, luôn trên cùng</span>
+        <span>Show block centers (debug) — yellow spheres</span>
       </label>
 
       <div className="three-demo-layout">
@@ -187,8 +187,8 @@ export function ThreeDemoPage() {
           </Canvas>
         </div>
 
-        <aside className="three-metrics-panel" aria-label="Tọa độ và kích thước khối">
-          <h2>Tâm (world) &amp; kích thước</h2>
+        <aside className="three-metrics-panel" aria-label="Block center and size">
+          <h2>World center &amp; size</h2>
           {metricRows.map((row, i) => (
             <div key={i} className="metric-block">
               <div className="metric-title">
@@ -197,14 +197,14 @@ export function ThreeDemoPage() {
               <table>
                 <tbody>
                   <tr>
-                    <th>Tâm world</th>
+                    <th>World center</th>
                     <td className="mono">{formatVec3(row.worldCenter)}</td>
                   </tr>
                   <tr>
                     <th>
-                      Kích thước
+                      Size
                       <br />
-                      <span style={{ fontWeight: 400, opacity: 0.8 }}>rộng×cao×sâu</span>
+                      <span style={{ fontWeight: 400, opacity: 0.8 }}>width×height×depth</span>
                     </th>
                     <td className="mono">
                       {row.size[0]} × {row.size[1]} × {row.size[2]}
@@ -215,10 +215,9 @@ export function ThreeDemoPage() {
             </div>
           ))}
           <p className="note">
-            <strong>Ghi chú:</strong> Trục Y là chiều cao. <em>Tâm world</em> là điểm giữa hình hộp sau
-            khi cộng offset gốc <code>ThreeBuildings</code> ({formatVec3(THREE_BUILDINGS_ROOT)}), vị trí
-            group từng tòa, và <code>position</code> của mesh. Kích thước trùng{' '}
-            <code>boxGeometry args</code>. Checkbox phía trên bật marker tâm từng khối (debug).
+            <strong>Note:</strong> Y is height. <em>World center</em> is the box center after adding the
+            <code>ThreeBuildings</code> root offset ({formatVec3(THREE_BUILDINGS_ROOT)}), tower group offset,
+            and mesh/group local position. Size matches <code>boxGeometry args</code>.
           </p>
         </aside>
       </div>

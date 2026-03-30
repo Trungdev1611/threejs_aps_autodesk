@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { ApsViewerPage } from './pages/ApsViewerPage'
 import { HomePage } from './pages/HomePage'
+import { ModelsPage } from './pages/ModelsPage'
 import { ThreeDemoPage } from './pages/ThreeDemoPage'
 
 export default function App() {
@@ -10,6 +11,7 @@ export default function App() {
       <Route element={<Layout />}>
         <Route index element={<HomePage />} />
         <Route path="three" element={<ThreeDemoPage />} />
+        <Route path="models" element={<ModelsPage />} />
         <Route path="aps" element={<ApsViewerPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

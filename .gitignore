@@ -13,3 +13,4 @@ client/dist/
 .env
 .env.*.local
 appsettings.*.local.json
+server/appsettings.Development.json

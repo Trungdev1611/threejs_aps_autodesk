@@ -5,7 +5,7 @@ import axios from 'axios'
  * Production: đặt VITE_API_BASE_URL=https://your-api.example.com
  */
 export const axiosClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5299',
+  baseURL: import.meta.env.VITE_API_BASE_URL ?? '',
   headers: {
     'Content-Type': 'application/json',
   },

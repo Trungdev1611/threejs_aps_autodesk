@@ -2,7 +2,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_APS_URN?: string
-  /** Nếu set, mọi request dùng origin này thay vì same-origin + proxy (build tĩnh + API riêng subdomain). */
+  /** If set, requests use this origin instead of same-origin + Vite proxy (static FE + separate API host). */
   readonly VITE_API_BASE_URL?: string
 }
 

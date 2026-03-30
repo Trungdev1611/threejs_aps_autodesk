@@ -1,15 +1,20 @@
 # BIM portal sample (React + Three.js + .NET + APS)
 
-Mẫu bám JD: **dashboard** gọi API .NET, **Three.js** qua React Three Fiber, **Autodesk Viewer** + token APS từ backend.
+This repo is a small **BIM-style web portal** showcasing:
+- a React dashboard UI,
+- a Three.js (R3F) page for custom 3D,
+- an APS pipeline: **upload -> URN -> translate -> manifest polling -> Viewer**,
+- and PostgreSQL persistence for model metadata.
 
-## Cần cài trên máy
+## Prerequisites
 
-| Thành phần | Mục đích |
-|------------|----------|
-| **Node.js** (LTS) | `client` — Vite, React, R3F |
-| **.NET 8 SDK** | `server` — Web API, proxy token APS |
+| Tool | Used for |
+|------|----------|
+| **Node.js** (LTS) | `client` — Vite + React + R3F |
+| **.NET 8 SDK** | `server` — ASP.NET Core API |
+| **PostgreSQL** | model metadata (`models` table) |
 
-## Chạy nhanh
+## Run locally
 
 **Terminal 1 — API**
 
@@ -19,7 +24,7 @@ dotnet restore
 dotnet run
 ```
 
-Mặc định: `http://localhost:5299` (xem `Properties/launchSettings.json`).
+API default: `http://localhost:5299` (see `Properties/launchSettings.json`).
 
 **Terminal 2 — Frontend**
 
@@ -29,14 +34,15 @@ npm install
 npm run dev
 ```
 
-Mở `http://localhost:5173`. Vite proxy `/api` → `5299`.
+Open `http://localhost:5173`. Vite proxies `/api` to `5299`.
 
-## Cấu hình tùy chọn
+## Configuration (dev)
 
-- **APS**: đặt `Aps:ClientId` và `Aps:ClientSecret` trên server (`appsettings.Development.json` hoặc `dotnet user-secrets`). Chi tiết: `server/README.md`.
-- **URN model**: copy `client/.env.example` → `client/.env`, điền `VITE_APS_URN=` sau khi file đã translate trên APS.
+- Copy `server/appsettings.Development.example.json` to `server/appsettings.Development.json` (not committed) and fill:
+  - `Aps:ClientId`, `Aps:ClientSecret`
+  - `ConnectionStrings:Default`
 
-## Cấu trúc
+## Structure
 
-- `client/` — React + TypeScript + Vite, `@react-three/fiber`, `@react-three/drei`, `react-router-dom`
-- `server/` — ASP.NET Core minimal API, CORS cho origin Vite, `GET /api/projects`, `GET /api/aps/token`
+- `client/` — React + TypeScript + Vite, `@react-three/fiber`, `@react-three/drei`
+- `server/` — ASP.NET Core Minimal API + APS integration + PostgreSQL repository
