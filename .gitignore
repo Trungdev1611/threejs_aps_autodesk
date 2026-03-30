@@ -1,0 +1,15 @@
+# .NET
+server/bin/
+server/obj/
+*.user
+*.suo
+
+# Node
+client/node_modules/
+client/dist/
+*.log
+
+# Env / secrets
+.env
+.env.*.local
+appsettings.*.local.json
