@@ -12,5 +12,5 @@ client/dist/
 # Env / secrets
 .env
 .env.*.local
-appsettings.*.local.json
-server/appsettings.Development.json
+# appsettings.*.local.json
+# server/appsettings.Development.json

@@ -2,6 +2,7 @@ import axios from 'axios'
 import { useEffect, useMemo, useState } from 'react'
 import { axiosClient } from '../api/axiosClient'
 import { InlineApsViewer } from '../components/InlineApsViewer'
+import { useToast } from '../components/toast'
 
 type StoredModel = {
   id: string
@@ -20,12 +21,14 @@ const ALLOWED_EXTENSIONS = ['.dwg', '.dxf', '.ifc', '.rvt', '.nwd', '.nwc', '.rt
 const ACCEPT_ATTR = ALLOWED_EXTENSIONS.join(',')
 
 export function ModelsPage() {
+  const toast = useToast()
   const [models, setModels] = useState<StoredModel[]>([])
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadState, setUploadState] = useState<UploadState>('idle')
   const [message, setMessage] = useState<string>('Select a design file and click Upload.')
   const [activeUrn, setActiveUrn] = useState<string>('')
   const [viewUrn, setViewUrn] = useState<string>('')
+  const [viewerNonce, setViewerNonce] = useState<number>(0)
 
   const isBusy = uploadState === 'uploading' || uploadState === 'translating'
 
@@ -65,21 +68,25 @@ export function ModelsPage() {
 
     setUploadState('uploading')
     setMessage('Uploading to APS storage...')
+    toast.info('Uploading file to APS…', 'Upload')
     try {
       const { data } = await axiosClient.post<StoredModel>('/api/models/upload', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       setActiveUrn(data.urn)
       setUploadState('uploaded')
-      setMessage(`Uploaded: ${data.fileName}. URN created, you can run Translate.`)
+      setMessage(`Upload successful: ${data.fileName}. Please click Translate to start conversion.`)
+      toast.success('Upload successful. Click Translate to start conversion.', 'Upload')
       await loadModels()
     } catch (e) {
       setUploadState('error')
       if (axios.isAxiosError(e) && e.response?.data) {
         const payload = e.response.data as { error?: string }
         setMessage(payload.error ?? `Upload failed (HTTP ${e.response.status}).`)
+        toast.error(payload.error ?? `Upload failed (HTTP ${e.response.status}).`, 'Upload')
       } else {
         setMessage('Upload failed.')
+        toast.error('Upload failed.', 'Upload')
       }
     }
   }
@@ -96,10 +103,17 @@ export function ModelsPage() {
 
       if (status === 'success') {
         setUploadState('uploaded')
+        setMessage('Translation successful. Click Viewer to open the model.')
+        toast.success('Translation successful. Click Viewer to open the model.', 'Translate')
+        if (viewUrn.trim() && normalizeUrn(viewUrn) === normalizeUrn(urn)) {
+          setViewerNonce((n) => n + 1)
+        }
         return
       }
       if (status === 'failed') {
         setUploadState('error')
+        setMessage('Translation failed. Check APS logs/manifest for details.')
+        toast.error('Translation failed. Check APS manifest for details.', 'Translate')
         return
       }
       if (attempt >= maxAttempts) {
@@ -114,6 +128,7 @@ export function ModelsPage() {
     } catch {
       setUploadState('error')
       setMessage('Status polling failed.')
+      toast.error('Status polling failed.', 'Translate')
     }
   }
 
@@ -121,6 +136,7 @@ export function ModelsPage() {
     if (!canTranslate || isBusy) return
     setUploadState('translating')
     setMessage('Translation job started. Polling status…')
+    toast.info('Translation job started. Polling status…', 'Translate')
     try {
       await axiosClient.post('/api/models/' + encodeURIComponent(activeUrn) + '/translate')
       await pollStatus(activeUrn)
@@ -129,10 +145,23 @@ export function ModelsPage() {
       if (axios.isAxiosError(e) && e.response?.data) {
         const payload = e.response.data as { error?: string }
         setMessage(payload.error ?? `Translate failed (HTTP ${e.response.status}).`)
+        toast.error(payload.error ?? `Translate failed (HTTP ${e.response.status}).`, 'Translate')
       } else {
         setMessage('Translate failed.')
+        toast.error('Translate failed.', 'Translate')
       }
     }
+  }
+
+  function normalizeUrn(input: string) {
+    return input.trim().replace(/^urn:/, '')
+  }
+
+  function openViewer(urn: string) {
+    const u = urn.trim()
+    if (!u) return
+    setViewUrn(u)
+    setViewerNonce((n) => n + 1)
   }
 
   return (
@@ -158,7 +187,7 @@ export function ModelsPage() {
             Translate
           </button>
           <button
-            onClick={() => setViewUrn(activeUrn)}
+            onClick={() => openViewer(activeUrn)}
             disabled={!activeUrn}
             className="viewer-link"
           >
@@ -188,7 +217,7 @@ export function ModelsPage() {
         )}
       </div>
 
-      {viewUrn && <InlineApsViewer urn={viewUrn} />}
+      {viewUrn && <InlineApsViewer key={`${viewUrn}:${viewerNonce}`} urn={viewUrn} />}
 
       <table className="table">
         <thead>
@@ -210,7 +239,7 @@ export function ModelsPage() {
               <td>
                 <button
                   className="linklike"
-                  onClick={() => setViewUrn(m.urn)}
+                  onClick={() => openViewer(m.urn)}
                   disabled={m.status !== 'success'}
                 >
                   Viewer

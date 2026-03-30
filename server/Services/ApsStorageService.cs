@@ -29,8 +29,9 @@ public sealed class ApsStorageService
         await EnsureBucketExistsAsync(accessToken, ct);
 
         var objectKey = BuildObjectKey(fileName);
-        var signedUrl = await CreateSignedS3UploadUrlAsync(accessToken, objectKey, ct);
-        await UploadToSignedUrlAsync(signedUrl, stream, ct);
+        var (signedUrl, uploadKey) = await CreateSignedS3UploadAsync(accessToken, objectKey, ct);
+        var eTag = await UploadToSignedUrlAsync(signedUrl, stream, ct);
+        await CompleteSignedS3UploadAsync(accessToken, objectKey, uploadKey, eTag, ct);
 
         // After upload succeeds, fetch object details to get objectId.
         var (objectId, uploadedObjectKey) = await GetObjectDetailsAsync(accessToken, objectKey, ct);
@@ -39,28 +40,20 @@ public sealed class ApsStorageService
         return (objectId, uploadedObjectKey, ToUrn(objectId));
     }
 
-    private async Task<string> CreateSignedS3UploadUrlAsync(
+    private async Task<(string SignedUrl, string UploadKey)> CreateSignedS3UploadAsync(
         string accessToken,
         string objectKey,
         CancellationToken ct)
     {
-        // APS OSS direct-to-S3: ask APS for a pre-signed S3 upload URL.
+        // APS OSS direct-to-S3: create an upload session and receive signed S3 URL(s).
         var escapedObjectKey = Uri.EscapeDataString(objectKey);
         var escapedBucketKey = Uri.EscapeDataString(_options.BucketKey);
         var url =
-            $"https://developer.api.autodesk.com/oss/v2/buckets/{escapedBucketKey}/objects/{escapedObjectKey}/signed?access=write&useCdn=true";
-
-        var payload = JsonSerializer.Serialize(
-            new
-            {
-                minutesExpiration = 60,
-                singleUse = true,
-            });
+            $"https://developer.api.autodesk.com/oss/v2/buckets/{escapedBucketKey}/objects/{escapedObjectKey}/signeds3upload?parts=1&minutesExpiration=60&useCdn=true";
 
         var http = _httpFactory.CreateClient();
-        using var req = new HttpRequestMessage(HttpMethod.Post, url);
+        using var req = new HttpRequestMessage(HttpMethod.Get, url);
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        req.Content = new StringContent(payload, Encoding.UTF8, "application/json");
         using var res = await http.SendAsync(req, ct);
         var json = await res.Content.ReadAsStringAsync(ct);
         if (!res.IsSuccessStatusCode)
@@ -70,20 +63,27 @@ public sealed class ApsStorageService
         }
 
         using var doc = JsonDocument.Parse(json);
-        // Typical response field name: signedUrl
-        if (doc.RootElement.TryGetProperty("signedUrl", out var signedUrlProp))
+        var uploadKey = doc.RootElement.TryGetProperty("uploadKey", out var uk) ? uk.GetString() : null;
+        if (string.IsNullOrWhiteSpace(uploadKey))
         {
-            var signedUrl = signedUrlProp.GetString();
+            throw new InvalidOperationException("APS signed upload response missing uploadKey.");
+        }
+
+        if (doc.RootElement.TryGetProperty("urls", out var urls) &&
+            urls.ValueKind == JsonValueKind.Array &&
+            urls.GetArrayLength() > 0)
+        {
+            var signedUrl = urls[0].GetString();
             if (!string.IsNullOrWhiteSpace(signedUrl))
             {
-                return signedUrl;
+                return (signedUrl, uploadKey!);
             }
         }
 
-        throw new InvalidOperationException("APS signed upload response missing signedUrl.");
+        throw new InvalidOperationException("APS signed upload response missing urls[0].");
     }
 
-    private async Task UploadToSignedUrlAsync(string signedUrl, Stream stream, CancellationToken ct)
+    private async Task<string> UploadToSignedUrlAsync(string signedUrl, Stream stream, CancellationToken ct)
     {
         // Upload bytes directly to S3 using the signed URL (no Bearer token).
         var http = _httpFactory.CreateClient();
@@ -96,6 +96,55 @@ public sealed class ApsStorageService
             var body = await res.Content.ReadAsStringAsync(ct);
             throw new InvalidOperationException(
                 $"S3 upload failed ({(int)res.StatusCode}): {body}");
+        }
+
+        // Complete call needs the ETag returned by S3.
+        if (res.Headers.ETag is not null && !string.IsNullOrWhiteSpace(res.Headers.ETag.Tag))
+        {
+            return res.Headers.ETag.Tag.Trim('"');
+        }
+
+        if (res.Headers.TryGetValues("ETag", out var values))
+        {
+            var v = values.FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(v))
+            {
+                return v.Trim().Trim('"');
+            }
+        }
+
+        throw new InvalidOperationException("S3 upload did not return an ETag header.");
+    }
+
+    private async Task CompleteSignedS3UploadAsync(
+        string accessToken,
+        string objectKey,
+        string uploadKey,
+        string eTag,
+        CancellationToken ct)
+    {
+        var escapedObjectKey = Uri.EscapeDataString(objectKey);
+        var escapedBucketKey = Uri.EscapeDataString(_options.BucketKey);
+        var url =
+            $"https://developer.api.autodesk.com/oss/v2/buckets/{escapedBucketKey}/objects/{escapedObjectKey}/signeds3upload";
+
+        var payload = JsonSerializer.Serialize(
+            new
+            {
+                uploadKey,
+                eTags = new[] { eTag },
+            });
+
+        var http = _httpFactory.CreateClient();
+        using var req = new HttpRequestMessage(HttpMethod.Post, url);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        req.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+        using var res = await http.SendAsync(req, ct);
+        var json = await res.Content.ReadAsStringAsync(ct);
+        if (!res.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"APS complete signed upload failed ({(int)res.StatusCode}): {json}");
         }
     }
 

@@ -9,8 +9,7 @@ public sealed class ApsAuthService
     private readonly IHttpClientFactory _httpFactory;
     private readonly ApsOptions _options;
     private readonly SemaphoreSlim _lock = new(1, 1);
-    private string? _token;
-    private DateTimeOffset _expiresAt = DateTimeOffset.MinValue;
+    private readonly Dictionary<string, (string Token, DateTimeOffset ExpiresAt)> _cache = new();
 
     public ApsAuthService(IHttpClientFactory httpFactory, IOptions<ApsOptions> options)
     {
@@ -35,11 +34,11 @@ public sealed class ApsAuthService
         await _lock.WaitAsync(ct);
         try
         {
-            // Reuse cached token while still valid to reduce auth calls.
-            if (!string.IsNullOrWhiteSpace(_token) && DateTimeOffset.UtcNow < _expiresAt)
+            // Cache tokens per-scope. Viewer scopes are narrower than OSS upload scopes.
+            if (_cache.TryGetValue(scope, out var cached) && DateTimeOffset.UtcNow < cached.ExpiresAt)
             {
-                var ttl = Math.Max(1, (int)(_expiresAt - DateTimeOffset.UtcNow).TotalSeconds);
-                return (_token!, ttl);
+                var ttl = Math.Max(1, (int)(cached.ExpiresAt - DateTimeOffset.UtcNow).TotalSeconds);
+                return (cached.Token, ttl);
             }
 
             var http = _httpFactory.CreateClient();
@@ -72,9 +71,9 @@ public sealed class ApsAuthService
             }
 
             // Small safety margin so we refresh before hard expiry.
-            _token = accessToken;
-            _expiresAt = DateTimeOffset.UtcNow.AddSeconds(Math.Max(1, expiresIn - 30));
-            return (_token, expiresIn);
+            var expiresAt = DateTimeOffset.UtcNow.AddSeconds(Math.Max(1, expiresIn - 30));
+            _cache[scope] = (accessToken, expiresAt);
+            return (accessToken, expiresIn);
         }
         finally
         {
