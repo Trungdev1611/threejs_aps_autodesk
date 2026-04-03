@@ -16,39 +16,81 @@ Dưới đây là danh sách các câu hỏi phỏng vấn phổ biến về Rea
 
 **Virtual DOM là gì và nó hoạt động như thế nào?**
 
-> **Gợi ý trả lời:** Giải thích về cơ chế Diffing algorithm, cách React tạo ra một bản sao của DOM thật bằng JS object và chỉ cập nhật những phần thay đổi để tối ưu hiệu năng.
+Định nghĩa: Virtual DOM (VDOM) là một Object JavaScript bản sao của DOM thật, nằm trong RAM.
+
+Cơ chế: Khi State thay đổi, React tạo ra VDOM mới và so sánh nó với VDOM cũ (gọi là thuật toán Diffing).
+
+Kết quả: React tìm ra những điểm khác biệt nhỏ nhất và chỉ cập nhật đúng phần đó lên DOM thật.
+
+Lợi ích: Tránh việc trình duyệt phải tính toán lại và repaint toàn bộ trang web, giúp tăng tốc độ xử lý rõ rệt.
 
 **Sự khác biệt giữa Functional Component và Class Component? Tại sao hiện nay Functional Component lại được ưu tiên?**
-
-> **Gợi ý trả lời:** Đề cập đến Hook, sự gọn nhẹ của code, dễ test và xu hướng loại bỏ this phức tạp trong Class.
+> function component thì ra đời sau class component, nó ngắn gọn tường minh và dễ hiểu hơn, lifecycle của nó thì cũng quản lý hơn so với class vì được tóm gọn trong dependencies, tái sử dụng logic với customhooks và tránh từ khóa bind this như class component cũng là điểm cộng
 
 **React Hooks là gì? Giải thích useState và useEffect.**
 
-> **Gợi ý trả lời:** Hook cho phép dùng state và lifecycle trong functional component. useEffect dùng để xử lý side-effects (API call, subscriptions).
+Hooks: Là các hàm giúp Functional Component sử dụng được State và Lifecycle.
+
+useState: Quản lý dữ liệu trong Component. Khi dữ liệu thay đổi, React so sánh và quyết định có render lại giao diện hay không.
+
+useEffect: Xử lý các tác vụ bên lề (Side Effects) như gọi API. Nó có 3 chế độ chạy dựa vào Dependency Array và có hàm Return để dọn dẹp (Cleanup) tài nguyên khi Component bị hủy.
 
 **Trình bày quy tắc của Hooks (Rules of Hooks).**
 
-> **Gợi ý trả lời:** Chỉ gọi Hook ở cấp cao nhất (không gọi trong vòng lặp/điều kiện) và chỉ gọi trong React functions.
+Quy tắc 1 (Thứ tự): Chỉ gọi Hooks ở cấp cao nhất của Component. Không đặt trong vòng lặp, điều kiện hay hàm lồng nhau để đảm bảo React luôn đọc đúng thứ tự các Hooks sau mỗi lần render.
+
+Quy tắc 2 (Phạm vi): Chỉ gọi Hooks trong Functional Component hoặc Custom Hooks, không gọi trong hàm JavaScript thông thường.
 
 ### 2. State Management (Quản lý trạng thái)
 
 **Khi nào nên dùng Redux thay vì Context API?**
+Dùng Context API khi: Ứng dụng vừa và nhỏ, cần chia sẻ các dữ liệu ít thay đổi (như Theme, Ngôn ngữ, Thông tin User đăng nhập). 
+nhược điểm là khi gộp chung nhiều loại trong một context (như theme, user...) thì khi thay đổi 1 phần như user, các component dùng theme sẽ bị re-render, cái này redux có thể khắc phục dc
 
-> **Gợi ý trả lời:** Context API phù hợp cho các state ít thay đổi (theme, ngôn ngữ). Redux/Zustand phù hợp cho các ứng dụng lớn, logic phức tạp, cần công cụ debug mạnh (Redux DevTools) và tần suất cập nhật state cao.
+Dùng Redux khi: Ứng dụng lớn, dữ liệu thay đổi liên tục và cần tối ưu hiệu năng re-render; cần quy trình xử lý dữ liệu (Middleware) chặt chẽ và công cụ Debug chuyên nghiệp.
+
+Nhược điểm: Redux có nhiều Boilerplate code (code rườm rà), nhưng hiện nay đã được khắc phục rất nhiều nhờ Redux Toolkit.
 
 **Redux Toolkit (RTK) có gì cải tiến so với Redux truyền thống?**
 
-> **Gợi ý trả lời:** Giảm boilerplate code (createSlice), tích hợp sẵn Immer (giúp viết code thay đổi state như thể mutation nhưng thực tế là immutable) và cấu hình sẵn middleware.
+ Giảm boilerplate code (createSlice),
+ tích hợp sẵn Immer (giúp viết code thay đổi state như thể mutation nhưng thực tế là immutable) 
+ và cấu hình sẵn middleware để thao tác async thay vì dùng các middleware như thunk hay saga
 
 ### 3. Performance Optimization (Tối ưu hiệu năng)
 
 **Làm sao để ngăn chặn một component re-render không cần thiết?**
 
-> **Gợi ý trả lời:** Sử dụng React.memo, useMemo cho giá trị và useCallback cho function. Giải thích về việc so sánh "shallow comparison".
+1. Sử dụng React.memo (Cho Component)
+Khi nào dùng: Khi bạn có một Component con nhận props từ Component cha, nhưng không phải lúc nào cha render thì con cũng cần chạy lại.
+
+Cơ chế: React.memo sẽ thực hiện Shallow Compare (so sánh nông) các props. Nếu props không đổi, nó sẽ bỏ qua việc render lại Component đó.
+
+2. Sử dụng useCallback (Cho Function)
+Vấn đề: Trong React, mỗi lần Component render, các hàm khai báo bên trong nó sẽ được khởi tạo mới (địa chỉ ô nhớ thay đổi). Nếu bạn truyền hàm này xuống Component con đã bọc React.memo, con vẫn sẽ bị re-render vì nó thấy "hàm này khác hàm cũ".
+
+Giải pháp: Dùng useCallback để giữ nguyên tham chiếu của hàm đó giữa các lần render.
+
+3. Sử dụng useMemo (Cho giá trị/tính toán nặng)
+Vấn đề: Bạn có một logic tính toán phức tạp (ví dụ: filter danh sách 1000 user, xử lý dữ liệu 3D từ dự án Salmo++). Bạn không muốn mỗi lần gõ phím vào ô Search là toàn bộ logic đó phải chạy lại.
+
+Giải pháp: useMemo sẽ lưu lại kết quả tính toán và chỉ tính lại khi các dependencies thay đổi.
+
+4. Kiểm tra kỹ Dependencies (Tránh "bẫy" useEffect)
+Như bạn đã nói, việc check kỹ dependencies là cực kỳ quan trọng.
+
+Lỗi thường gặp: Đưa một Object hoặc Array được khai báo trực tiếp trong thân Component vào dependency. Vì mỗi lần render chúng là Object mới, useEffect sẽ chạy vô tận.
+
+Mẹo: Đưa logic tính toán Object đó vào useMemo trước khi cho vào dependency.
+
+5. Sử dụng State hợp lý (State Colocatio
+   
 
 **Lazy loading trong React là gì?**
 
-> **Gợi ý trả lời:** Sử dụng React.lazy và Suspense để chia nhỏ code (code-splitting), chỉ tải những component cần thiết khi người dùng truy cập tới.
+Lazy Loading là kỹ thuật trì hoãn việc tải các tài nguyên không thiết yếu. Trong React, tôi thường dùng 
+React.lazy kết hợp Suspense để thực hiện Code Splitting theo Route, giúp giảm kích thước Bundle ban đầu. 
+Với hình ảnh, tôi ưu tiên dùng thuộc tính loading='lazy' hoặc Intersection Observer để tối ưu hóa việc tải tài nguyên khi người dùng cuộn trang
 
 ### 4. Ecosystem & Advanced (Hệ sinh thái & Nâng cao)
 
@@ -58,7 +100,12 @@ Dưới đây là danh sách các câu hỏi phỏng vấn phổ biến về Rea
 
 **Server-Side Rendering (SSR) với Next.js khác gì so với Client-Side Rendering (CSR) truyền thống?**
 
-> **Gợi ý trả lời:** SSR giúp SEO tốt hơn, thời gian hiển thị trang đầu tiên (FCP) nhanh hơn vì HTML được render sẵn trên server.
+Đặc điểm,                    CSR (React/Vite),                       SSR (Next.js)
+SEO                    ,Kém (Bot khó đọc nội dung động).,             Tốt (Bot đọc được HTML đầy đủ).
+Tốc độ lần đầu,         Chậm (Phải đợi tải và chạy JS).,               Nhanh (Hiển thị HTML ngay).
+Tốc độ chuyển trang,    Rất nhanh (Chỉ tải dữ liệu JSON).,              Có thể chậm hơn (Server phải render lại).
+Tải trọng Server        Thấp (Server chỉ gửi file tĩnh).,              Cao (Server phải tính toán render HTML).
+Bảo mật,                 Lộ logic API ở Client.,                        Che giấu được các API Key quan trọng.
 
 **React Query (TanStack Query) giải quyết vấn đề gì?**
 
